@@ -159,7 +159,7 @@ struct BookDetailView: View {
                         Button("发送") {
                             UIApplication.shared.endEditing(true)
                             DispatchQueue.main.async {
-                                let textToSend = replyText
+                                let textToSend = isReplying ? replyText : newCommentText
                                 let newComment = Comment(username: UserManager.shared.username, content: textToSend)
 
                                 if isReplying, let index = replyingToIndex {
