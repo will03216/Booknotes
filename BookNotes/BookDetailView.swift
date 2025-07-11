@@ -113,103 +113,103 @@ struct BookDetailView: View {
                     }
                 }
                 
+                GeometryReader { geometry in
+                    if isReplying, let index = replyingToIndex {
+                        HStack {
+                            Text("回复 @\(comments[index].username)")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                            Spacer()
+                            Button("取消") {
+                                isReplying = false
+                                replyingToIndex = nil
+                                replyText = ""
+                            }
+                            .font(.caption)
+                            .foregroundColor(.red)
+                        }
+                        .padding(.horizontal)
+                    }
+
+                    HStack(alignment: .bottom) {
+                        ZStack(alignment: .topLeading) {
+                            if (isReplying ? replyText : newCommentText).isEmpty {
+                                Text(isReplying ? "回复评论..." : "写下你的评论...")
+                                    .foregroundColor(.gray)
+                                    .padding(.top, 8)
+                                    .padding(.leading, 5)
+                            }
+
+                            
+                            AutoGrowingTextView(
+                                text: isReplying ? $replyText : $newCommentText,
+                                dynamicHeight: $inputHeight,
+                                placeholder: isReplying ? "回复评论..." : "写下你的评论..."
+                            )
+                            .id(isReplying)      // ← 关键：切换时重建
+                            .frame(height: inputHeight)
+                            .frame(width: geometry.size.width * 0.75)
+                            .focused($isInputActive)
+                            .padding(4)
+                            .background(Color(UIColor.systemGray6))
+                            .cornerRadius(6)
+
+                        }
+                        
+                        Button("发送") {
+                            UIApplication.shared.endEditing(true)
+                            DispatchQueue.main.async {
+                                let textToSend = replyText
+                                let newComment = Comment(username: UserManager.shared.username, content: textToSend)
+
+                                if isReplying, let index = replyingToIndex {
+                                    // 1) 追加回复
+                                    comments[index].replies.append(newComment)
+                                    // 2) 自动滚动到这条评论
+                                    withAnimation {
+                                        scrollProxy.scrollTo(index, anchor: .bottom)
+                                    }
+                                    // 3) 重置状态
+                                    isReplying = false
+                                    replyingToIndex = nil
+                                    replyText = ""
+                                } else {
+                                    // （你也可以对新评论同样调用 scrollTo(comments.count-1)）
+                                    comments.append(newComment)
+                                    newCommentText = ""
+                                    withAnimation {
+                                        scrollProxy.scrollTo(comments.count - 1, anchor: .bottom)
+                                    }
+                                }
+
+                                saveComments()
+                            }
+                        }
+
+
+
+
+
+
+                        
+                        if UserManager.shared.username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                               Text("⚠️ 请设置用户名")
+                                   .font(.caption)
+                                   .foregroundColor(.red)
+                                   .padding(.bottom, 4)
+                           }
+
+                    }
+                }
+                .frame(height: inputHeight + 16) // ✅ 保证整体区域够高
+                .padding(.horizontal)
+                
 
             }
            
             
         
-            GeometryReader { geometry in
-                if isReplying, let index = replyingToIndex {
-                    HStack {
-                        Text("回复 @\(comments[index].username)")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                        Spacer()
-                        Button("取消") {
-                            isReplying = false
-                            replyingToIndex = nil
-                            replyText = ""
-                        }
-                        .font(.caption)
-                        .foregroundColor(.red)
-                    }
-                    .padding(.horizontal)
-                }
-
-                HStack(alignment: .bottom) {
-                    ZStack(alignment: .topLeading) {
-                        if (isReplying ? replyText : newCommentText).isEmpty {
-                            Text(isReplying ? "回复评论..." : "写下你的评论...")
-                                .foregroundColor(.gray)
-                                .padding(.top, 8)
-                                .padding(.leading, 5)
-                        }
-
-                        
-                        AutoGrowingTextView(
-                            text: isReplying ? $replyText : $newCommentText,
-                            dynamicHeight: $inputHeight,
-                            placeholder: isReplying ? "回复评论..." : "写下你的评论..."
-                        )
-                        .id(isReplying)      // ← 关键：切换时重建
-                        .frame(height: inputHeight)
-                        .frame(width: geometry.size.width * 0.75)
-                        .focused($isInputActive)
-                        .padding(4)
-                        .background(Color(UIColor.systemGray6))
-                        .cornerRadius(6)
-
-                    }
-                    
-                    Button("发送") {
-                        // 打 log：按钮点击
-                        print("🚀 点击发送, isReplying=\(isReplying), raw replyText='\(replyText)', newCommentText='\(newCommentText)'")
-
-                        // 收起键盘
-                        UIApplication.shared.endEditing(true)
-
-                        // 再打一遍 log，确认 endEditing 前后有没有变化
-                        print("⏱ after endEditing, replyText='\(replyText)', newCommentText='\(newCommentText)'")
-
-                        DispatchQueue.main.async {
-                            let textToSend = isReplying ? replyText : newCommentText
-                            print("⏳ inside async, textToSend = '\(textToSend)'")
-
-                            let newComment = Comment(username: UserManager.shared.username,
-                                                     content: textToSend)
-                            if isReplying, let index = replyingToIndex {
-                                comments[index].replies.append(newComment)
-                                print("➕ append reply to comments[\(index)].replies: now replies = \(comments[index].replies.map { $0.content })")
-                                isReplying = false
-                                replyingToIndex = nil
-                                replyText = ""
-                            } else {
-                                comments.append(newComment)
-                                print("➕ append new comment: now comments = \(comments.map { $0.content })")
-                                newCommentText = ""
-                            }
-                            saveComments()
-                            print("✅ saveComments called, total comments = \(comments.count)")
-                        }
-                    }
-
-
-
-
-
-
-                    
-                    if UserManager.shared.username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                           Text("⚠️ 请设置用户名")
-                               .font(.caption)
-                               .foregroundColor(.red)
-                               .padding(.bottom, 4)
-                       }
-
-                }
-            }
-            .frame(height: inputHeight + 16) // ✅ 保证整体区域够高
-            .padding(.horizontal)
+   
         }
         .navigationTitle(book.title)
         .onAppear {
