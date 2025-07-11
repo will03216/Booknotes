@@ -1,5 +1,14 @@
 import SwiftUI
+import UIKit   // ← 新增
 
+extension UIApplication {
+    /// 结束所有编辑，强制收起键盘
+    func endEditing(_ force: Bool) {
+        windows
+            .first { $0.isKeyWindow }?
+            .endEditing(force)
+    }
+}
 
 struct BookDetailView: View {
     let book: Book
@@ -8,6 +17,10 @@ struct BookDetailView: View {
     @State private var newCommentText: String = ""
     @FocusState private var isInputActive: Bool
     @State private var inputHeight: CGFloat = 30
+    @State private var isReplying = false
+    @State private var replyingToIndex: Int? = nil
+    @State private var replyText = ""
+
 
     var body: some View {
         VStack {
@@ -22,8 +35,11 @@ struct BookDetailView: View {
                     .cornerRadius(8)
                     .padding(.horizontal)
                 List {
-                    ForEach(comments, id: \.id) { comment in
+                    ForEach(comments.indices, id: \.self) { index in
+                        let comment = comments[index]
+                        
                         VStack(alignment: .leading, spacing: 3) {
+                            // ✅ 主评论内容
                             Text(comment.username)
                                 .font(.headline)
                                 .foregroundColor(.blue)
@@ -32,6 +48,7 @@ struct BookDetailView: View {
                             Text(formatDate(comment.timestamp))
                                 .font(.caption)
                                 .foregroundColor(.gray)
+                            
                             HStack {
                                 Spacer()
                                 Button(action: {
@@ -44,64 +61,141 @@ struct BookDetailView: View {
                             }
                             .font(.caption)
                             .padding(.top, 1)
+                            
+                            // ✅ 回复按钮
+                            Button("回复") {
+                                replyingToIndex = index
+                                isReplying = true
+                                replyText = ""
+                                isInputActive = true
+                            }
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                            .padding(.top, 2)
+
+                            // ✅ 显示该评论下的所有 replies
+                            ForEach(comment.replies) { reply in
+                                HStack(alignment: .top) {
+                                    Spacer().frame(width: 20) // 缩进
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(reply.username)
+                                            .font(.subheadline)
+                                            .foregroundColor(.purple)
+                                        Text(reply.content)
+                                            .font(.body)
+                                        Text(formatDate(reply.timestamp))
+                                            .font(.caption2)
+                                            .foregroundColor(.gray)
+                                    }
+                                }
+                            }
+
                             Divider()
                                 .frame(height: 0.5)
                                 .background(Color.gray.opacity(0.3))
-                            
                         }
-                        
-                        
                         .padding(.vertical, 4)
                         .listRowSeparator(.hidden)
-                        
                     }
-                    .onDelete(perform: deleteComment) // ✅ 正确：这个 ForEach 整体支持删除
-                    .listStyle(.plain)
-                    
-                    .onChange(of: comments.count) { _ in
-                        if let lastID = comments.last?.id {
-                            DispatchQueue.main.async {
-                                withAnimation {
-                                    scrollProxy.scrollTo(lastID, anchor: .bottom)
-                                }
+
+                    .onDelete(perform: deleteComment)
+                }
+                .listStyle(.plain)
+                .onChange(of: comments.count) { _ in
+                    if let lastID = comments.last?.id {
+                        DispatchQueue.main.async {
+                            withAnimation {
+                                scrollProxy.scrollTo(lastID, anchor: .bottom)
                             }
                         }
                     }
                 }
-                    
+                
+
             }
+           
             
-            
+        
             GeometryReader { geometry in
+                if isReplying, let index = replyingToIndex {
+                    HStack {
+                        Text("回复 @\(comments[index].username)")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                        Spacer()
+                        Button("取消") {
+                            isReplying = false
+                            replyingToIndex = nil
+                            replyText = ""
+                        }
+                        .font(.caption)
+                        .foregroundColor(.red)
+                    }
+                    .padding(.horizontal)
+                }
+
                 HStack(alignment: .bottom) {
                     ZStack(alignment: .topLeading) {
-                        if newCommentText.isEmpty {
-                            Text("写下你的评论...")
+                        if (isReplying ? replyText : newCommentText).isEmpty {
+                            Text(isReplying ? "回复评论..." : "写下你的评论...")
                                 .foregroundColor(.gray)
                                 .padding(.top, 8)
                                 .padding(.leading, 5)
                         }
+
                         
-                        AutoGrowingTextView(text: $newCommentText, dynamicHeight: $inputHeight, placeholder: "写下你的评论...")
-                            .frame(height: inputHeight)
-                            .frame(width: geometry.size.width * 0.75)
-                            .focused($isInputActive)
-                            .padding(4)
-                            .background(Color(UIColor.systemGray6))
-                            .cornerRadius(6)
+                        AutoGrowingTextView(
+                            text: isReplying ? $replyText : $newCommentText,
+                            dynamicHeight: $inputHeight,
+                            placeholder: isReplying ? "回复评论..." : "写下你的评论..."
+                        )
+                        .id(isReplying)      // ← 关键：切换时重建
+                        .frame(height: inputHeight)
+                        .frame(width: geometry.size.width * 0.75)
+                        .focused($isInputActive)
+                        .padding(4)
+                        .background(Color(UIColor.systemGray6))
+                        .cornerRadius(6)
+
                     }
                     
                     Button("发送") {
-                        let newComment = Comment(username: UserManager.shared.username, content: newCommentText)
-                        comments.append(newComment)
-                        newCommentText = ""
-                        saveComments()
-                        isInputActive = false
+                        // 打 log：按钮点击
+                        print("🚀 点击发送, isReplying=\(isReplying), raw replyText='\(replyText)', newCommentText='\(newCommentText)'")
+
+                        // 收起键盘
+                        UIApplication.shared.endEditing(true)
+
+                        // 再打一遍 log，确认 endEditing 前后有没有变化
+                        print("⏱ after endEditing, replyText='\(replyText)', newCommentText='\(newCommentText)'")
+
+                        DispatchQueue.main.async {
+                            let textToSend = isReplying ? replyText : newCommentText
+                            print("⏳ inside async, textToSend = '\(textToSend)'")
+
+                            let newComment = Comment(username: UserManager.shared.username,
+                                                     content: textToSend)
+                            if isReplying, let index = replyingToIndex {
+                                comments[index].replies.append(newComment)
+                                print("➕ append reply to comments[\(index)].replies: now replies = \(comments[index].replies.map { $0.content })")
+                                isReplying = false
+                                replyingToIndex = nil
+                                replyText = ""
+                            } else {
+                                comments.append(newComment)
+                                print("➕ append new comment: now comments = \(comments.map { $0.content })")
+                                newCommentText = ""
+                            }
+                            saveComments()
+                            print("✅ saveComments called, total comments = \(comments.count)")
+                        }
                     }
-                    .disabled(
-                        newCommentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-                        UserManager.shared.username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                    )
+
+
+
+
+
+
                     
                     if UserManager.shared.username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                            Text("⚠️ 请设置用户名")

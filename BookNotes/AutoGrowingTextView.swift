@@ -1,5 +1,6 @@
 import SwiftUI
 
+
 struct AutoGrowingTextView: UIViewRepresentable {
     @Binding var text: String
     @Binding var dynamicHeight: CGFloat
@@ -37,21 +38,36 @@ struct AutoGrowingTextView: UIViewRepresentable {
     }
 
     func makeCoordinator() -> Coordinator {
-        return Coordinator(text: $text)
+        // 一定要把 dynamicHeight 和 placeholder 也传进来
+        return Coordinator(
+            text: $text,
+            dynamicHeight: $dynamicHeight,
+            placeholder: placeholder
+        )
     }
+
 
     class Coordinator: NSObject, UITextViewDelegate {
         @Binding var text: String
+        var dynamicHeight: Binding<CGFloat>
+        let placeholder: String
 
-        init(text: Binding<String>) {
+        init(text: Binding<String>,
+             dynamicHeight: Binding<CGFloat>,
+             placeholder: String) {
             _text = text
+            self.dynamicHeight = dynamicHeight
+            self.placeholder = placeholder
         }
 
         func textViewDidChange(_ textView: UITextView) {
             text = textView.text
+            AutoGrowingTextView.recalculateHeight(view: textView, result: dynamicHeight)
+            print("📝 textViewDidChange, binding text = '\(text)'")
         }
 
         func textViewDidBeginEditing(_ textView: UITextView) {
+            // 把占位符清掉
             if textView.textColor == .gray {
                 textView.text = ""
                 textView.textColor = .label
@@ -59,12 +75,16 @@ struct AutoGrowingTextView: UIViewRepresentable {
         }
 
         func textViewDidEndEditing(_ textView: UITextView) {
-            if textView.text.isEmpty {
-                textView.text = "写下你的评论..."
+            text = textView.text
+            AutoGrowingTextView.recalculateHeight(view: textView, result: dynamicHeight)
+            print("🔒 textViewDidEndEditing, binding text = '\(text)'")
+            if text.isEmpty {
+                textView.text = placeholder
                 textView.textColor = .gray
             }
         }
     }
+
 
     static func recalculateHeight(view: UIView, result: Binding<CGFloat>) {
         let newSize = view.sizeThatFits(CGSize(width: view.bounds.width, height: .greatestFiniteMagnitude))
