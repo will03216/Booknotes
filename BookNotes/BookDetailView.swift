@@ -96,16 +96,18 @@ struct BookDetailView: View {
                         }
                         .padding(.vertical, 4)
                         .listRowSeparator(.hidden)
+                        .id(index)
                     }
 
                     .onDelete(perform: deleteComment)
                 }
                 .listStyle(.plain)
                 .onChange(of: comments.count) { _ in
-                    if let lastID = comments.last?.id {
+                    // 滚动到最后一条评论的索引
+                    if let lastIndex = comments.indices.last {
                         DispatchQueue.main.async {
                             withAnimation {
-                                scrollProxy.scrollTo(lastID, anchor: .bottom)
+                                scrollProxy.scrollTo(lastIndex, anchor: .bottom)
                             }
                         }
                     }
