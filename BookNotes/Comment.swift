@@ -3,7 +3,7 @@ import Foundation
 struct Comment: Identifiable, Codable {
     let id: UUID
     let username: String
-    let content: String
+    var content: String
     let timestamp: Date
     var likeCount: Int
     var isLiked: Bool

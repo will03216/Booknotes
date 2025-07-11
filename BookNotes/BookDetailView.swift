@@ -22,6 +22,10 @@ struct BookDetailView: View {
     @State private var replyText = ""
     enum SortMode { case timeDesc, likeDesc }
     @State private var sortMode: SortMode = .timeDesc
+    @State private var isEditing: Bool = false
+    @State private var editingIndex: Int? = nil
+    @State private var editText: String = ""
+    
 
 
     var body: some View {
