@@ -20,11 +20,27 @@ struct BookDetailView: View {
     @State private var isReplying = false
     @State private var replyingToIndex: Int? = nil
     @State private var replyText = ""
+    enum SortMode { case timeDesc, likeDesc }
+    @State private var sortMode: SortMode = .timeDesc
 
 
     var body: some View {
         VStack {
+            Picker("排序", selection: $sortMode) {
+                    Text("时间↓").tag(SortMode.timeDesc)
+                    Text("点赞↓").tag(SortMode.likeDesc)
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal)
             ScrollViewReader { scrollProxy in
+                let displayIndices: [Int] = {
+                        switch sortMode {
+                        case .timeDesc:
+                            return comments.indices.sorted { comments[$0].timestamp > comments[$1].timestamp }
+                        case .likeDesc:
+                            return comments.indices.sorted { comments[$0].likeCount > comments[$1].likeCount }
+                        }
+                    }()
                 ScrollView {
                         Text(book.content)
                             .font(.body)
@@ -35,7 +51,7 @@ struct BookDetailView: View {
                     .cornerRadius(8)
                     .padding(.horizontal)
                 List {
-                    ForEach(comments.indices, id: \.self) { index in
+                    ForEach(displayIndices, id: \.self) { index in
                         let comment = comments[index]
                         
                         VStack(alignment: .leading, spacing: 3) {
